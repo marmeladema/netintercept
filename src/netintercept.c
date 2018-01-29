@@ -103,6 +103,7 @@ void netintercept_unlock() {
 }
 
 void netintercept_dump(uint8_t *data, size_t len) {
+	netintercept_lock();
 	if(!ctx.pcap_dumper) {
 		ctx.pcap_dumper = pcap_dump_open(ctx.pcap, ctx.path);
 		if(!ctx.pcap_dumper) {
@@ -119,6 +120,7 @@ void netintercept_dump(uint8_t *data, size_t len) {
 
 	pcap_dump((uint8_t *)ctx.pcap_dumper, &pkthdr, data);
 	pcap_dump_flush(ctx.pcap_dumper);
+	netintercept_unlock();
 }
 
 struct stream *netintercept_add_stream(struct stream *stream) {
