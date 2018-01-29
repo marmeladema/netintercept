@@ -85,7 +85,7 @@ static const char *type_to_string(int domain) {
 	netintercept_unlock();
 
 void netintercept_lock() {
-	if(lock_counter == 0) {
+	if(lock_counter == 1) {
 		if(pthread_mutex_lock(&ctx.lock) != 0) {
 			perror("pthread_mutex_lock");
 			abort();
@@ -94,7 +94,7 @@ void netintercept_lock() {
 }
 
 void netintercept_unlock() {
-	if(lock_counter == 0) {
+	if(lock_counter == 1) {
 		if(pthread_mutex_unlock(&ctx.lock) != 0) {
 			perror("pthread_mutex_unlock");
 			abort();
