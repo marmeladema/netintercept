@@ -275,7 +275,9 @@ void __attribute__((constructor)) netintercept_init(void) {
 }
 
 void __attribute__((destructor)) netintercept_fini(void) {
-	pcap_dump_close(ctx.pcap_dumper);
+	if(ctx.pcap_dumper) {
+		pcap_dump_close(ctx.pcap_dumper);
+	}
 	pcap_close(ctx.pcap);
 }
 
