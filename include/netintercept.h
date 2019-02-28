@@ -64,6 +64,7 @@ struct netintercept_context {
 	pcap_t *pcap;
 	char path[PATH_MAX];
 	pcap_dumper_t *pcap_dumper;
+	struct bpf_program filter;
 
 	socket_t *socket;
 	connect_t *connect;

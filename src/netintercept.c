@@ -107,6 +107,7 @@ void netintercept_dump(uint8_t *data, size_t len) {
 	if(!ctx.pcap_dumper) {
 		ctx.pcap_dumper = pcap_dump_open(ctx.pcap, ctx.path);
 		if(!ctx.pcap_dumper) {
+			fprintf(stderr, "pcap_dump_open error: could not open \"%s\"%s\n", ctx.path, pcap_geterr(ctx.pcap));
 			abort();
 		}
 	}
@@ -118,8 +119,15 @@ void netintercept_dump(uint8_t *data, size_t len) {
 	pkthdr.len = len;
 	pkthdr.caplen = pkthdr.len;
 
-	pcap_dump((uint8_t *)ctx.pcap_dumper, &pkthdr, data);
-	pcap_dump_flush(ctx.pcap_dumper);
+	bool match = true;
+	if(ctx.filter.bf_len) {
+		match = pcap_offline_filter(&ctx.filter, &pkthdr, data);
+	}
+
+	if(match) {
+		pcap_dump((uint8_t *)ctx.pcap_dumper, &pkthdr, data);
+		pcap_dump_flush(ctx.pcap_dumper);
+	}
 	netintercept_unlock();
 }
 
@@ -205,7 +213,18 @@ void __attribute__((constructor)) netintercept_init(void) {
 
 	ctx.pcap = pcap_open_dead(DLT_RAW, 65535);
 	if(!ctx.pcap) {
+		perror("pcap_open_dead");
 		abort();
+	}
+
+	const char *filter = getenv("NETINTERCEPT_FILTER");
+	if(filter) {
+		NETINTERCEPT_STACK_PUSH();
+		if(pcap_compile(ctx.pcap, &ctx.filter, filter, 1, PCAP_NETMASK_UNKNOWN) != 0) {
+			pcap_perror(ctx.pcap, "pcap_compile");
+			abort();
+		}
+		NETINTERCEPT_STACK_POP();
 	}
 
 	const char *file = getenv("NETINTERCEPT_FILE");
