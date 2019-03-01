@@ -572,6 +572,9 @@ ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags) {
 
 	if(lock_counter == 1) {
 		if(ret > 0) {
+			if(msg->msg_name && msg->msg_namelen) {
+				stream_init(stream, sockfd, msg->msg_name, msg->msg_namelen);
+			}
 			uint8_t *data = malloc(ret);
 			size_t i, bytes = (size_t)ret, offset = 0, length;
 			for(i = 0; i < msg->msg_iovlen && offset < bytes; i++) {
@@ -683,6 +686,9 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags) {
 
 	if(lock_counter == 1) {
 		if(ret > 0) {
+			if(stream->type == SOCK_DGRAM && msg->msg_name && msg->msg_namelen) {
+				stream_init(stream, sockfd, msg->msg_name, msg->msg_namelen);
+			}
 			uint8_t *data = malloc(ret);
 			size_t i, bytes = (size_t)ret, offset = 0, length;
 			for(i = 0; i < msg->msg_iovlen && offset < bytes; i++) {
