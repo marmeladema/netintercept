@@ -1,10 +1,7 @@
 #ifndef _NETINTERCEPT_H_
 #define _NETINTERCEPT_H_
 
-#include <nspr/prio.h>
-#include <nspr/private/pprio.h>
-
-#include <nss/ssl.h>
+#include "config.h"
 
 typedef int socket_t(int domain, int type, int protocol);
 typedef int connect_t(int sockfd, const struct sockaddr *addr, socklen_t addrlen);
@@ -22,23 +19,31 @@ typedef ssize_t sendto_t(int sockfd, const void *buf, size_t len, int flags, con
 typedef ssize_t sendmsg_t(int sockfd, const struct msghdr *msg, int flags);
 typedef int sendmmsg_t(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags);
 
-/* <OpenSSL> */
+#if OPENSSL_FOUND
+
+#include <openssl/bio.h>
+#include <openssl/ssl.h>
+
 typedef int SSL_read_t(SSL *ssl, void *buf, int num);
 typedef int SSL_write_t(SSL *ssl, const void *buf, int num);
 typedef int SSL_get_fd_t(const SSL *ssl);
 
 typedef int BIO_read_t(BIO *b, void *buf, int len);
 typedef int BIO_write_t(BIO *b, const void *buf, int len);
-/* </OpenSSL> */
+#endif // OPENSSL_FOUND
 
-/* <NSPR> */
+#if NSPR_FOUND
+
+#include <nspr/prio.h>
+#include <nspr/private/pprio.h>
+
 typedef PROsfd PR_FileDesc2NativeHandle_t(PRFileDesc *);
 typedef const PRIOMethods* PR_GetTCPMethods_t(void);
 typedef const PRIOMethods* PR_GetUDPMethods_t(void);
 typedef PRInt32 PR_Read_t(PRFileDesc *fd, void *buf, PRInt32 amount);
 typedef PRInt32 PR_Write_t(PRFileDesc *fd,const void *buf,PRInt32 amount);
 typedef PRInt32 PR_Writev_t(PRFileDesc *fd, const PRIOVec *iov, PRInt32 iov_size, PRIntervalTime timeout);
-/* </NSPR> */
+#endif // NSPR_FOUND
 
 /* <NSS> */
 /*
@@ -82,6 +87,7 @@ struct netintercept_context {
 	sendmsg_t *sendmsg;
 	sendmmsg_t *__sendmmsg;
 
+#if OPENSSL_FOUND
 	SSL_read_t *ssl_read;
 	SSL_write_t *ssl_write;
 	SSL_get_fd_t *ssl_get_rfd;
@@ -89,13 +95,17 @@ struct netintercept_context {
 
 	BIO_read_t *bio_read;
 	BIO_write_t *bio_write;
+#endif // OPENSSL_FOUND
 
+#if NSPR_FOUND
 	PR_FileDesc2NativeHandle_t *pr_filedesc2nativehandle;
 	PR_GetTCPMethods_t *pr_gettcpmethods;
 	PRSendFN tcp_pt_send;
 	PRRecvFN tcp_pt_recv;
 	PR_Read_t *pr_read;
 	PR_Write_t *pr_write;
+#endif // NSPR_FOUND
+
 /*
 	ssl_DefSend_t *ssl_defsend;
 	ssl_SecureSend_t *ssl_securesend;

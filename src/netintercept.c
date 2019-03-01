@@ -19,10 +19,6 @@
 /* libpcap includes */
 #include <pcap/pcap.h>
 
-/* openssl includes */
-#include <openssl/bio.h>
-#include <openssl/ssl.h>
-
 #include "netintercept.h"
 #include "stream.h"
 
@@ -749,6 +745,8 @@ int __sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
 	return ret;
 }
 
+#if OPENSSL_FOUND
+
 int SSL_read(SSL *ssl, void *buf, int num) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
@@ -875,7 +873,9 @@ int BIO_write(BIO *b, const void *buf, int len) {
 	return ret;
 }
 
-/* <NSPR> */
+#endif // OPENSSL_FOUND
+
+#if NSPR_FOUND
 
 PRInt32 tcp_pt_Recv(PRFileDesc *fd, void *buf, PRInt32 amount, PRIntn flags, PRIntervalTime timeout) {
 	int orig_errno = errno;
@@ -999,4 +999,4 @@ PRInt32 PR_Write(PRFileDesc *fd,const void *buf,PRInt32 amount) {
 }
 
 //typedef PRInt32 PR_Writev_t(PRFileDesc *fd, const PRIOVec *iov, PRInt32 iov_size, PRIntervalTime timeout);
-/* </NSPR> */
+#endif // NSPR_FOUND

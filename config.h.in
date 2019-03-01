@@ -1,0 +1,2 @@
+#cmakedefine01 OPENSSL_FOUND
+#cmakedefine01 NSPR_FOUND
