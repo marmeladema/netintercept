@@ -16,6 +16,8 @@
 
 #include <arpa/inet.h>
 
+#include <link.h>
+
 /* libpcap includes */
 #include <pcap/pcap.h>
 
@@ -65,6 +67,25 @@ static const char *type_to_string(int domain) {
 }
 */
 
+struct dl_iterate_phdr_data {
+	const char *func_name;
+	void *func_cur;
+	void *func_ptr;
+};
+
+static int
+dl_iterate_phdr_callback(struct dl_phdr_info *info, size_t __attribute__((unused)) size, void *__data)
+{
+	struct dl_iterate_phdr_data *data = (struct dl_iterate_phdr_data *)__data;
+	void *dlh = dlopen(info->dlpi_name, RTLD_LAZY);
+	void *func_ptr = dlsym(dlh, data->func_name);
+	if(func_ptr && func_ptr != data->func_cur) {
+		data->func_ptr = func_ptr;
+		return 1;
+	}
+	return 0;
+}
+
 #define NETINTERCEPT_STACK_PUSH() lock_counter++
 #define NETINTERCEPT_STACK_POP() lock_counter--
 #define NETINTERCEPT_STACK_SIZE() lock_counter
@@ -74,8 +95,17 @@ static const char *type_to_string(int domain) {
 	if(!ctx.hook_name) {\
 		ctx.hook_name = dlsym(RTLD_NEXT, func_name);\
 		if(!ctx.hook_name) {\
-			printf("[%d] dlsym error: %s\n", getpid(), dlerror());\
-			abort();\
+			struct dl_iterate_phdr_data data = {\
+				func_name,\
+				dlsym(RTLD_DEFAULT, func_name),\
+				NULL\
+			};\
+			dl_iterate_phdr(dl_iterate_phdr_callback, &data);\
+			if(!data.func_ptr) {\
+				fprintf(stderr, "[%d] Could not hook %s\n", getpid(), func_name);\
+				abort();\
+			}\
+			ctx.hook_name = data.func_ptr;\
 		}\
 	}\
 	netintercept_unlock();
