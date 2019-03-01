@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stddef.h>
 #include <memory.h>
 #include <time.h>
 #include <unistd.h>
@@ -12,6 +13,89 @@
 
 #include "stream.h"
 
+uint16_t cksum_generic(unsigned char *p, size_t len, uint16_t initial)
+{
+	uint32_t sum = htons(initial);
+	const uint16_t *u16 = (const uint16_t *)p;
+
+	while (len >= (sizeof(*u16) * 4)) {
+		sum += u16[0];
+		sum += u16[1];
+		sum += u16[2];
+		sum += u16[3];
+		len -= sizeof(*u16) * 4;
+		u16 += 4;
+	}
+	while (len >= sizeof(*u16)) {
+		sum += *u16;
+		len -= sizeof(*u16);
+		u16 += 1;
+	}
+
+	/* if length is in odd bytes */
+	if (len == 1) {
+		sum += *((const uint8_t *)u16);
+	}
+
+	while(sum>>16) {
+		sum = (sum & 0xFFFF) + (sum>>16);
+	}
+	return ntohs((uint16_t)~sum);
+}
+
+// calculates the initial checksum value resulting from
+// the pseudo header.
+// return values:
+// 0x0000 - 0xFFFF : initial checksum (in host byte order).
+// 0xFFFF0001 : unknown packet (non IPv4/6 or non TCP/UDP)
+// 0xFFFF0002 : bad header
+uint32_t pseudo_header_initial(const int8_t *buf, size_t len)
+{
+	const uint16_t *hwbuf = (const uint16_t *)buf;
+	int8_t ipv = (buf[0] & 0xF0) >> 4;
+	int8_t proto = 0;
+	int headersize = 0;
+
+	if (ipv == 4) { // IPv4
+		proto = buf[9];
+		headersize = (buf[0] & 0x0F) * 4;
+	} else if (ipv == 6) { // IPv6
+		proto = buf[6];
+		headersize = 40;
+	} else {
+		return 0xFFFF0001;
+	}
+
+	if (proto == 6 || proto == 17) { // TCP || UDP
+		uint32_t sum = 0;
+		len -= headersize;
+		if (ipv == 4) { // IPv4
+			if (cksum_generic((unsigned char *)buf, headersize, 0) != 0) {
+				return 0xFFFF0002;
+			}
+			sum = htons(len & 0x0000FFFF) + (proto << 8)
+							+ hwbuf[6]
+							+ hwbuf[7]
+							+ hwbuf[8]
+							+ hwbuf[9];
+
+		} else { // IPv6
+			sum = hwbuf[2] + (proto << 8);
+			int i;
+			for (i = 4; i < 20; i+=4) {
+				sum += hwbuf[i] +
+				       hwbuf[i+1] +
+				       hwbuf[i+2] +
+				       hwbuf[i+3];
+			}
+		}
+		sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
+		sum = ((sum & 0xffff0000) >> 16) + (sum & 0xffff);
+		return ntohs(sum);
+	}
+	return 0xFFFF0001;
+}
+
 static uint16_t *peer_len(int family, struct stream_peer *peer) {
 	if(family == AF_INET) {
 		return &peer->ip4.tot_len;
@@ -23,6 +107,7 @@ static uint16_t *peer_len(int family, struct stream_peer *peer) {
 
 size_t stream_dump(int family, int protocol, struct stream_peer *peer, const uint8_t *data, size_t len, stream_dump_t *dump) {
 	uint8_t pkt[1500], *ip_ptr = NULL, *trans_ptr = NULL;
+	uint16_t *cksum_ptr = NULL;
 	size_t ip_len = 0, trans_len = 0;
 
 	if(family == AF_INET) {
@@ -38,9 +123,11 @@ size_t stream_dump(int family, int protocol, struct stream_peer *peer, const uin
 	if(protocol == IPPROTO_TCP) {
 		trans_ptr = (uint8_t *)&peer->tcp;
 		trans_len = sizeof(peer->tcp);
+		cksum_ptr = (uint16_t *)(pkt + ip_len + offsetof(struct tcphdr, check));
 	} else if(protocol == IPPROTO_UDP) {
 		trans_ptr = (uint8_t *)&peer->udp;
 		trans_len = sizeof(peer->udp);
+		cksum_ptr = (uint16_t *)(pkt + ip_len + offsetof(struct udphdr, check));
 	} else {
 		abort();
 	}
@@ -57,9 +144,16 @@ size_t stream_dump(int family, int protocol, struct stream_peer *peer, const uin
 		}
 	}
 
+	if(family == AF_INET) {
+		peer->ip4.check = 0;
+		peer->ip4.check = htons(cksum_generic((uint8_t *)&peer->ip4, sizeof(peer->ip4), 0));
+	}
+
 	memcpy(pkt, ip_ptr, ip_len);
 	memcpy(pkt+ip_len, trans_ptr, trans_len);
 	memcpy(pkt+ip_len+trans_len, data, len);
+
+	*cksum_ptr = htons(cksum_generic(pkt+ip_len, trans_len + len, pseudo_header_initial((int8_t *)pkt, ip_len + trans_len + len)));
 
 	dump(pkt, ip_len + trans_len + len);
 	
