@@ -68,3 +68,9 @@ You can configure the name of the pcap file with the `NETINTERCEPT_FILE` environ
 * `%u`: (numeric) real UID of dumped process
 
 Those patterns are indeed inspired by the `/proc/sys/kernel/core_pattern` file from Linux (see man 5 core).
+
+You can also select the packets you are interested in with a tcpdump filter using the `NETINTERCEPT_FILTER` environment variable:
+
+    LD_PRELOAD=$PWD/netintercept.so NETINTERCEPT_FILTER=tcp <program>
+
+For more information about tcpdump filters, read https://www.tcpdump.org/manpages/pcap-filter.7.html
