@@ -420,7 +420,7 @@ int shutdown(int sockfd, int how) {
 int close(int fd) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(close, "close");
 
 	struct stream *stream = netintercept_get_stream(fd, NULL, 0);
@@ -452,7 +452,7 @@ int close(int fd) {
 ssize_t read(int fd, void *buf, size_t count) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(read, "read");
 
 	struct stream *stream = NULL;
@@ -484,7 +484,7 @@ ssize_t read(int fd, void *buf, size_t count) {
 ssize_t write(int fd, const void *buf, size_t count) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(write, "write");
 
 	struct stream *stream = NULL;
@@ -516,7 +516,7 @@ ssize_t write(int fd, const void *buf, size_t count) {
 ssize_t recv(int sockfd, void *buf, size_t len, int flags) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(recv, __func__);
 
 	struct stream *stream = NULL;
@@ -548,7 +548,7 @@ ssize_t recv(int sockfd, void *buf, size_t len, int flags) {
 ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *src_addr, socklen_t *addrlen) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(recvfrom, __func__);
 
 	struct stream *stream = NULL;
@@ -583,7 +583,7 @@ ssize_t recvfrom(int sockfd, void *buf, size_t len, int flags, struct sockaddr *
 ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(recvmsg, __func__);
 
 	struct stream *stream = NULL;
@@ -630,7 +630,7 @@ ssize_t recvmsg(int sockfd, struct msghdr *msg, int flags) {
 ssize_t send(int sockfd, const void *buf, size_t len, int flags) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(send, __func__);
 
 	struct stream *stream = NULL;
@@ -662,7 +662,7 @@ ssize_t send(int sockfd, const void *buf, size_t len, int flags) {
 ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct sockaddr *dest_addr, socklen_t addrlen) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(sendto, __func__);
 
 	struct stream *stream = NULL;
@@ -697,7 +697,7 @@ ssize_t sendto(int sockfd, const void *buf, size_t len, int flags, const struct 
 ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(sendmsg, __func__);
 
 	struct stream *stream = NULL;
@@ -744,7 +744,7 @@ ssize_t sendmsg(int sockfd, const struct msghdr *msg, int flags) {
 int __sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(__sendmmsg, __func__);
 
 	struct stream *stream = NULL;
@@ -783,10 +783,41 @@ int __sendmmsg(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, int flags)
 
 #if OPENSSL_FOUND
 
+int SSL_connect(SSL *ssl) {
+	int orig_errno = errno;
+	NETINTERCEPT_STACK_PUSH();
+
+	NETINTERCEPT_SETUP_HOOK(ssl_get_rfd, "SSL_get_rfd");
+	NETINTERCEPT_SETUP_HOOK(ssl_connect, __func__);
+
+	int sockfd = ctx.ssl_get_rfd(ssl);
+	struct stream *stream = NULL;
+	if(lock_counter == 1) {
+		stream = netintercept_get_stream(sockfd, NULL, 0);
+		if(!stream) {
+			fprintf(stderr, "%s error: could not get stream for file descriptor %d\n", __func__, sockfd);
+			abort();
+		}
+		stream_lock(stream);
+	}
+
+	errno = orig_errno;
+	int ret = ctx.ssl_connect(ssl);
+	orig_errno = errno;
+
+	if(lock_counter == 1) {
+		stream_unlock(stream);
+	}
+
+	NETINTERCEPT_STACK_POP();
+	errno = orig_errno;
+	return ret;
+}
+
 int SSL_read(SSL *ssl, void *buf, int num) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(ssl_get_rfd, "SSL_get_rfd");
 	NETINTERCEPT_SETUP_HOOK(ssl_read, __func__);
 
@@ -821,7 +852,7 @@ int SSL_read(SSL *ssl, void *buf, int num) {
 int SSL_write(SSL *ssl, const void *buf, int num) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(ssl_get_wfd, "SSL_get_wfd");
 	NETINTERCEPT_SETUP_HOOK(ssl_write, __func__);
 
@@ -856,7 +887,7 @@ int SSL_write(SSL *ssl, const void *buf, int num) {
 int BIO_read(BIO *b, void *buf, int len) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(bio_read, __func__);
 
 	errno = orig_errno;
@@ -884,7 +915,7 @@ int BIO_read(BIO *b, void *buf, int len) {
 int BIO_write(BIO *b, const void *buf, int len) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(bio_write, __func__);
 
 	errno = orig_errno;
@@ -942,7 +973,7 @@ PRInt32 tcp_pt_Send(PRFileDesc *fd, const void *buf, PRInt32 amount, PRIntn flag
 const PRIOMethods* PR_GetTCPMethods(void) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	PR_GetTCPMethods_t *pr_gettcpmethods = ctx.pr_gettcpmethods;
 	NETINTERCEPT_SETUP_HOOK(pr_gettcpmethods, __func__);
 
@@ -964,10 +995,41 @@ const PRIOMethods* PR_GetTCPMethods(void) {
 	return ret;
 }
 
+PRStatus PR_Connect(PRFileDesc *fd, const PRNetAddr *addr, PRIntervalTime timeout) {
+	int orig_errno = errno;
+	NETINTERCEPT_STACK_PUSH();
+
+	NETINTERCEPT_SETUP_HOOK(pr_filedesc2nativehandle, "PR_FileDesc2NativeHandle");
+	NETINTERCEPT_SETUP_HOOK(pr_connect, __func__);
+
+	int sockfd = ctx.pr_filedesc2nativehandle(fd);
+	struct stream *stream = NULL;
+	if(lock_counter == 1) {
+		stream = netintercept_get_stream(sockfd, NULL, 0);
+		if(!stream) {
+			fprintf(stderr, "%s error: could not get stream for file descriptor %d\n", __func__, sockfd);
+			abort();
+		}
+		stream_lock(stream);
+	}
+
+	errno = orig_errno;
+	PRStatus status = ctx.pr_connect(fd, addr, timeout);
+	orig_errno = errno;
+
+	if(lock_counter == 1) {
+		stream_unlock(stream);
+	}
+
+	NETINTERCEPT_STACK_POP();
+	errno = orig_errno;
+	return status;
+}
+
 PRInt32 PR_Read(PRFileDesc *fd, void *buf, PRInt32 amount) {
 	int orig_errno = errno;
 	NETINTERCEPT_STACK_PUSH();
-	
+
 	NETINTERCEPT_SETUP_HOOK(pr_filedesc2nativehandle, "PR_FileDesc2NativeHandle");
 	NETINTERCEPT_SETUP_HOOK(pr_read, __func__);
 
