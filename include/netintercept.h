@@ -24,6 +24,7 @@ typedef int sendmmsg_t(int sockfd, struct mmsghdr *msgvec, unsigned int vlen, in
 #include <openssl/bio.h>
 #include <openssl/ssl.h>
 
+typedef int SSL_connect_t(SSL *ssl);
 typedef int SSL_read_t(SSL *ssl, void *buf, int num);
 typedef int SSL_write_t(SSL *ssl, const void *buf, int num);
 typedef int SSL_get_fd_t(const SSL *ssl);
@@ -40,6 +41,7 @@ typedef int BIO_write_t(BIO *b, const void *buf, int len);
 typedef PROsfd PR_FileDesc2NativeHandle_t(PRFileDesc *);
 typedef const PRIOMethods* PR_GetTCPMethods_t(void);
 typedef const PRIOMethods* PR_GetUDPMethods_t(void);
+typedef PRStatus PR_Connect_t(PRFileDesc *fd, const PRNetAddr *addr, PRIntervalTime timeout);
 typedef PRInt32 PR_Read_t(PRFileDesc *fd, void *buf, PRInt32 amount);
 typedef PRInt32 PR_Write_t(PRFileDesc *fd,const void *buf,PRInt32 amount);
 typedef PRInt32 PR_Writev_t(PRFileDesc *fd, const PRIOVec *iov, PRInt32 iov_size, PRIntervalTime timeout);
@@ -88,6 +90,7 @@ struct netintercept_context {
 	sendmmsg_t *__sendmmsg;
 
 #if OPENSSL_FOUND
+	SSL_connect_t *ssl_connect;
 	SSL_read_t *ssl_read;
 	SSL_write_t *ssl_write;
 	SSL_get_fd_t *ssl_get_rfd;
@@ -102,6 +105,7 @@ struct netintercept_context {
 	PR_GetTCPMethods_t *pr_gettcpmethods;
 	PRSendFN tcp_pt_send;
 	PRRecvFN tcp_pt_recv;
+	PR_Connect_t *pr_connect;
 	PR_Read_t *pr_read;
 	PR_Write_t *pr_write;
 #endif // NSPR_FOUND
